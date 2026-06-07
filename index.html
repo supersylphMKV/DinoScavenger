@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>WebXR Dino Hatch Game</title>
+    
+    <link rel="stylesheet" href="styles/main.css">
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="ar-overlay">
+        <div id="scanning-container" class="ui-screen hidden">
+            <div class="instruction-box">
+                <div class="spinner"></div>
+                <span id="instructions">Move phone to scan the floor...</span>
+            </div>
+            
+            <div class="scanner-visual">
+                <div class="scanner-laser"></div>
+                <div class="phone-icon-animation">📱👋</div>
+            </div>
+        </div>
+
+        <div id="gameplay-container" class="ui-screen hidden">
+            <div class="instruction-box">
+                <span id="game-instructions">Drag egg to move. Double-tap to hatch!</span>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="scripts/main.js"></script>
+
+</body>
+</html>

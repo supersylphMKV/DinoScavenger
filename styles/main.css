@@ -1,0 +1,115 @@
+body { 
+    margin: 0; 
+    overflow: hidden; 
+    font-family: sans-serif;
+    background-color: black;
+}
+
+canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: auto;
+}
+
+/* Core Overlay Structure */
+#ar-overlay { 
+    position: absolute; 
+    width: 100%; 
+    height: 100%; 
+    top: 0; 
+    left: 0; 
+    pointer-events: none; /* Crucial: Allows touches to pass through to the 3D WebXR canvas */
+    user-select: none;
+    background-color: transparent;
+}
+
+.ui-screen {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    box-sizing: border-box;
+    padding: 30px 20px;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Instruction Banner */
+.instruction-box { 
+    background: rgba(20, 20, 20, 0.85); 
+    color: #ffffff; 
+    padding: 14px 24px; 
+    border-radius: 30px; 
+    font-size: 16px; 
+    font-weight: 600; 
+    letter-spacing: 0.5px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Loading Spinner */
+.spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: #00ff88;
+    animation: spin 1s linear infinite;
+}
+
+/* Central Scanner Visual Elements */
+.scanner-visual {
+    position: absolute;
+    top: 35%;
+    width: 200px;
+    height: 200px;
+    border: 2px dashed rgba(0, 255, 136, 0.4);
+    border-radius: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+.scanner-laser {
+    position: absolute;
+    width: 100%;
+    height: 4px;
+    background: linear-gradient(to right, transparent, #00ff88, transparent);
+    box-shadow: 0 0 12px #00ff88;
+    animation: scanMove 2.5s ease-in-out infinite;
+}
+
+.phone-icon-animation {
+    font-size: 42px;
+    animation: deviceSway 3s ease-in-out infinite;
+}
+
+/* Keyframe Animations */
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes scanMove {
+    0% { top: 0%; }
+    50% { top: 100%; }
+    100% { top: 0%; }
+}
+
+@keyframes deviceSway {
+    0% { transform: translateX(-30px) rotate(-10deg); }
+    50% { transform: translateX(30px) rotate(10deg); }
+    100% { transform: translateX(-30px) rotate(-10deg); }
+}
