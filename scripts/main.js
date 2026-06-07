@@ -19,6 +19,7 @@ let isDragging = false;
 let lastTapTime = 0; 
 const DOUBLE_TAP_DELAY = 300;
 
+let dinoIndex = 4; // To track which dinosaur is currently active for navigation purposes
 // Asset paths (replace with your local web-accessible .glb files)
 const ASSETS = {
     reticle: 'assets/ar-target.glb',
@@ -31,18 +32,18 @@ const ASSETS = {
         'assets/tyranno.glb',
         'assets/velociraptor.glb'
     ],
-    foods: [
-        
+    pickables: [
+
     ]
 };
 
 const DINO_REGISTRY = {
-    'op_t-rex':       { speed: 0.24, scale: 0.35, power: 85, level: 1, health: 150, diet: 'carnivore', breedName: 'T-Rex' },
-    'raptor':         { speed: 0.54, scale: 0.45, power: 45, level: 1, health: 80 , diet: 'carnivore', breedName: 'Raptor' },
-    'stego':          { speed: 0.10, scale: 0.50, power: 60, level: 1, health: 200, diet: 'herbivore', breedName: 'Stegosaurus' },
-    'tricera':        { speed: 0.30, scale: 0.50, power: 70, level: 1, health: 180, diet: 'herbivore', breedName: 'Triceratops' },
-    'tyranno':        { speed: 0.24, scale: 0.40, power: 90, level: 1, health: 160, diet: 'carnivore', breedName: 'Tyrannosaurus' },
-    'velociraptor':   { speed: 0.60, scale: 0.45, power: 40, level: 1, health: 75 , diet: 'carnivore', breedName: 'Velociraptor' }
+    'op_t-rex':       { speed: 0.18, scale: .50, power: 85, level: 1, health: 150, diet: 'carnivore', breedName: 'T-Rex' },
+    'raptor':         { speed: 0.50, scale: .40, power: 45, level: 1, health: 80 , diet: 'carnivore', breedName: 'Raptor' },
+    'stego':          { speed: 0.07, scale: .40, power: 60, level: 1, health: 200, diet: 'herbivore', breedName: 'Stegosaurus' },
+    'tricera':        { speed: 0.08, scale: .40, power: 70, level: 1, health: 180, diet: 'herbivore', breedName: 'Triceratops' },
+    'tyranno':        { speed: 0.15, scale: .40, power: 90, level: 1, health: 160, diet: 'carnivore', breedName: 'Tyrannosaurus' },
+    'velociraptor':   { speed: 0.18, scale: .25, power: 40, level: 1, health: 75 , diet: 'carnivore', breedName: 'Velociraptor' }
 };
 
 let mixer = null; // For handling animations if using GLTF models with animations
@@ -361,7 +362,7 @@ function spawnEgg() {
         eggBoundingBox.getSize(eggSize); // Extracts width, height, depth into vector
         eggHeight = eggSize.y; // Capture the exact vertical height
         // Custom scale scaling down/up if your models look tiny or giant in AR
-        eggMesh.scale.set(0.5, 0.5, 0.5); 
+        eggMesh.scale.set(0.4, 0.4, 0.4); 
 
         scene.add(eggMesh);
         document.getElementById('instructions').innerText = "Egg Ready! Tap it to hatch a dino.";
@@ -377,7 +378,7 @@ function hatchEgg() {
     document.getElementById('game-instructions').innerText = "Hatching your dinosaur... 🦖";
 
     // 2. Randomly select one dinosaur path from your asset array
-    const randomIndex = Math.floor(Math.random() * ASSETS.dinos.length);
+    const randomIndex = dinoIndex > -1 && dinoIndex < ASSETS.dinos.length ? dinoIndex : Math.floor(Math.random() * ASSETS.dinos.length);
     const chosenDinoPath = ASSETS.dinos[randomIndex];
 
     // 3. Capture the exact location coordinates of the egg before deleting it
@@ -452,10 +453,12 @@ function spawnDinosaurProcess(assetPath, position, quaternion) {
 
         spawnedDino.userData = {
             speed: stats.speed,
+            scale: stats.scale,
             power: stats.power,
             level: stats.level,
             health: stats.health,
-            breedName: filename
+            diet: stats.diet,
+            breedName: stats.breedName
         };
         
         // 2. Apply PBR Material corrections for optimal mobile rendering
@@ -471,7 +474,7 @@ function spawnDinosaurProcess(assetPath, position, quaternion) {
         // 3. Inject the finished model into the active WebXR viewport scene
         scene.add(spawnedDino);
         
-        spawnedDino.scale.set(0.5, 0.5, 0.5); // Custom scale if your dinos look too big/small in AR
+        spawnedDino.scale.set(spawnedDino.userData.scale, spawnedDino.userData.scale, spawnedDino.userData.scale); // Custom scale if your dinos look too big/small in AR
 
         const cameraPosition = new THREE.Vector3();
         camera.getWorldPosition(cameraPosition);
