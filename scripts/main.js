@@ -19,7 +19,7 @@ let isDragging = false;
 let lastTapTime = 0; 
 const DOUBLE_TAP_DELAY = 300;
 
-let dinoIndex = 4; // To track which dinosaur is currently active for navigation purposes
+let dinoIndex = -1; // To track which dinosaur is currently active for navigation purposes
 // Asset paths (replace with your local web-accessible .glb files)
 const ASSETS = {
     reticle: 'assets/ar-target.glb',
@@ -494,6 +494,7 @@ function spawnDinosaurProcess(assetPath, position, quaternion) {
         // 4. Finalize game state updates
         gameState = 'HATCHED';
 
+        const gameplayContainer = document.getElementById('gameplay-container');
         const overlayText = document.getElementById('game-instructions');
 
         overlayText.innerText = "Look! Your dinosaur hatched! 🎉";
@@ -501,14 +502,15 @@ function spawnDinosaurProcess(assetPath, position, quaternion) {
         setTimeout(() => {
             // Check if the state hasn't been reset by an exit event
             if (gameState === 'HATCHED') {
-                overlayText.style.transition = "opacity 1s ease";
-                overlayText.style.opacity = "0";
+                gameplayContainer.style.transition = "opacity 1s ease";
+                gameplayContainer.style.opacity = "0";
                 
                 // Fully unmount from layout system once transition finishes
                 setTimeout(() => {
-                    overlayText.classList.add('hidden');
-                    // Reset styles for future notifications
-                    overlayText.style.opacity = "1"; 
+                    gameplayContainer.classList.add('hidden');
+                    
+                    // Clean up styling mutations so future state changes look fresh
+                    gameplayContainer.style.opacity = "1";
                 }, 1000);
             }
         }, 10000); // 10000ms = 10 seconds
