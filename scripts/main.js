@@ -93,7 +93,7 @@ function init() {
         // Reset the UI screen states in case this is a second playthrough
         document.getElementById('scanning-container').classList.remove('hidden');
         document.getElementById('gameplay-container').classList.add('hidden');
-        document.getElementById('instructions').innerText = "Move phone to scan the floor...";
+        document.getElementById('instructions').innerText = "Gerakan gadget untuk memindai lantai...";
     });
 
     // Triggered if the user hits the "Exit AR" button or closes the app browser window
@@ -194,7 +194,7 @@ function renderFrame(timestamp, frame) {
                     reticleGroup.matrix.fromArray(pose.transform.matrix);
                     
                     document.getElementById('scanning-container').classList.add('hidden');
-                    document.getElementById('instructions').innerText = "Surface found! Tap to drop the egg.";
+                    document.getElementById('instructions').innerText = "Lantai terdeteksi! Tap layar untuk menaruh telur.";
                 }
                 
                 // State B: Relocating/Dragging the Egg
@@ -206,14 +206,14 @@ function renderFrame(timestamp, frame) {
 
                     // Smoothly slide the egg to the new floor contact position
                     eggMesh.position.copy(newFloorPosition);
-                    document.getElementById('instructions').innerText = "Dragging egg... Double tap to hatch!";
+                    document.getElementById('instructions').innerText = "Tap untuk memindahkan telur, double-tap untuk menetaskan!";
                 }
             } else {
                 if (gameState === 'SCANNING') reticleGroup.visible = false;
             }
         }
 
-        if (gameState === 'HATCHED' && isWalking && spawnedDino) {
+        if (gameState === 'PLAYING' && isWalking && spawnedDino) {
         
             // 1. Calculate horizontal vector gap between Dino and Target
             const currentPos = spawnedDino.position;
@@ -321,7 +321,7 @@ function onTouchEnd(event) {
     isDragging = false;
 
     if(isSimpleTap) {
-        if (gameState === 'HATCHED' && lastActiveXRFrame) {
+        if (lastActiveXRFrame) {
             handleScreenTap(lastActiveXRFrame);
         }
 
@@ -332,7 +332,7 @@ function onTouchEnd(event) {
 function spawnEgg() {
     gameState = 'SPAWNED_EGG';
     reticleGroup.visible = false; // Hide tracking ring
-    document.getElementById('instructions').innerText = "Egg Spawned! Tap the egg to hatch it.";
+    document.getElementById('game-instructions').innerText = "Telur muncul! Tap telur untuk menetaskan.";
 
     loader.load(ASSETS.egg, (gltf) => {
         eggMesh = gltf.scene;
@@ -365,7 +365,7 @@ function spawnEgg() {
         eggMesh.scale.set(0.4, 0.4, 0.4); 
 
         scene.add(eggMesh);
-        document.getElementById('instructions').innerText = "Egg Ready! Tap it to hatch a dino.";
+        document.getElementById('game-instructions').innerText = "Telur siap! Tap telur untuk menetaskan.";
         document.getElementById('scanning-container').classList.add('hidden');
         document.getElementById('gameplay-container').classList.remove('hidden');
     });
@@ -375,7 +375,7 @@ function hatchEgg() {
     if (!eggMesh || gameState !== 'SPAWNED_EGG') return; 
     
     gameState = 'HATCHING';
-    document.getElementById('game-instructions').innerText = "Hatching your dinosaur... 🦖";
+    document.getElementById('game-instructions').innerText = "Tunggu... Dino sedang menetas 🦖";
 
     // 2. Randomly select one dinosaur path from your asset array
     const randomIndex = dinoIndex > -1 && dinoIndex < ASSETS.dinos.length ? dinoIndex : Math.floor(Math.random() * ASSETS.dinos.length);
@@ -396,44 +396,62 @@ function hatchEgg() {
 }
 
 function handleScreenTap(frame) {
-    if (gameState !== 'HATCHED' || !spawnedDino) return;
+    if (!spawnedDino) return;
 
-    raycaster.setFromCamera(touchPosition, camera);
+    const gameplayContainer = document.getElementById('gameplay-container');
+    const overlayText = document.getElementById('game-instructions');
 
-    const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -spawnedDino.position.y);
-    
-    const intersectionPoint = new THREE.Vector3();
-    
-    // 3. Find exactly where the screen ray intercepts our floor plane equations
-    if (raycaster.ray.intersectPlane(floorPlane, intersectionPoint)) {
+    if(gameState === 'PLAYING') {
+        raycaster.setFromCamera(touchPosition, camera);
+
+        const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -spawnedDino.position.y);
         
-        // Success! Copy the coordinates directly
-        targetDestination.copy(intersectionPoint);
-
-        reticleGroup.matrixAutoUpdate = true; // Allow manual positioning
-
-        if (!reticleGroup) {
-            const circleGeo = new THREE.RingGeometry(0.12, 0.15, 32);
-            circleGeo.rotateX(-Math.PI / 2);
-            const circleMat = new THREE.MeshBasicMaterial({ color: 0x00ff55, side: THREE.DoubleSide });
-            reticleGroup = new THREE.Mesh(circleGeo, circleMat);
-            scene.add(reticleGroup);
-        }
+        const intersectionPoint = new THREE.Vector3();
         
-        reticleGroup.position.copy(targetDestination);
-        reticleGroup.rotation.set(0, 0, 0); // Flat on the floor
-        reticleGroup.visible = true;
+        // 3. Find exactly where the screen ray intercepts our floor plane equations
+        if (raycaster.ray.intersectPlane(floorPlane, intersectionPoint)) {
+            
+            // Success! Copy the coordinates directly
+            targetDestination.copy(intersectionPoint);
 
-        // Kick off walking engine
-        isWalking = true;
+            reticleGroup.matrixAutoUpdate = true; // Allow manual positioning
 
-        // Play animation track
-        if (mixer && dinoAnimations && dinoAnimations.length > 0) {
-            mixer.stopAllAction();
-            let walkClip = dinoAnimations.find(clip => clip.name.toLowerCase().includes('walk'));
-            if (!walkClip) walkClip = dinoAnimations[0];
-            mixer.clipAction(walkClip).play();
+            if (!reticleGroup) {
+                const circleGeo = new THREE.RingGeometry(0.12, 0.15, 32);
+                circleGeo.rotateX(-Math.PI / 2);
+                const circleMat = new THREE.MeshBasicMaterial({ color: 0x00ff55, side: THREE.DoubleSide });
+                reticleGroup = new THREE.Mesh(circleGeo, circleMat);
+                scene.add(reticleGroup);
+            }
+            
+            reticleGroup.position.copy(targetDestination);
+            reticleGroup.rotation.set(0, 0, 0); // Flat on the floor
+            reticleGroup.visible = true;
+
+            // Kick off walking engine
+            isWalking = true;
+
+            // Play animation track
+            if (mixer && dinoAnimations && dinoAnimations.length > 0) {
+                mixer.stopAllAction();
+                let walkClip = dinoAnimations.find(clip => clip.name.toLowerCase().includes('walk'));
+                if (!walkClip) walkClip = dinoAnimations[0];
+                mixer.clipAction(walkClip).play();
+            }
         }
+    }else if (gameState === 'HATCHED') {
+        overlayText.innerText = "Hello, Aku adalah " + spawnedDino.userData.breedName;
+        gameState = 'GREETINGS';
+    }else if (gameState === 'GREETINGS') {
+        overlayText.innerText = "Aku harus mencari ibuku... Maukah kamu membantuku?";
+        gameState = 'AWAITING_HELP_RESPONSE';
+    }else if (gameState === 'AWAITING_HELP_RESPONSE') {
+        overlayText.innerText = "Terima kasih! Sekarang bantu aku tumbuh kuat!";
+        gameState = 'ROARING';
+        playOneShotAnimation(['roar','attack2'], () => {
+            gameState = 'PLAYING';
+            gameplayContainer.classList.add('hidden');
+        });
     }
 }
 
@@ -442,7 +460,7 @@ function spawnDinosaurProcess(assetPath, position, quaternion) {
     loader.load(assetPath, (gltf) => {
         spawnedDino = gltf.scene;
         dinoAnimations = gltf.animations;
-
+        console.log('[Animations] Detected animation clips:', dinoAnimations.map(clip => clip.name));
         const filename = assetPath.split('/').pop().replace('.glb', '');
 
         // 1. Match coordinates exactly to the captured layout parameters
@@ -494,26 +512,9 @@ function spawnDinosaurProcess(assetPath, position, quaternion) {
         // 4. Finalize game state updates
         gameState = 'HATCHED';
 
-        const gameplayContainer = document.getElementById('gameplay-container');
         const overlayText = document.getElementById('game-instructions');
 
-        overlayText.innerText = "Look! Your dinosaur hatched! 🎉";
-
-        setTimeout(() => {
-            // Check if the state hasn't been reset by an exit event
-            if (gameState === 'HATCHED') {
-                gameplayContainer.style.transition = "opacity 1s ease";
-                gameplayContainer.style.opacity = "0";
-                
-                // Fully unmount from layout system once transition finishes
-                setTimeout(() => {
-                    gameplayContainer.classList.add('hidden');
-                    
-                    // Clean up styling mutations so future state changes look fresh
-                    gameplayContainer.style.opacity = "1";
-                }, 1000);
-            }
-        }, 10000); // 10000ms = 10 seconds
+        overlayText.innerText = "Lihat! Dino kamu muncul! 🎉";
 
         // 5. Initialize Animation System
         if (dinoAnimations && dinoAnimations.length > 0) {
@@ -528,25 +529,14 @@ function spawnDinosaurProcess(assetPath, position, quaternion) {
             });
             mixer = new THREE.AnimationMixer(animationTarget);
             
-            // Look for a baked animation that matches an 'idle' pattern
-            let idleClip = dinoAnimations.find(clip => clip.name.toLowerCase().includes('idle'));
-            if (!idleClip) {
-                idleClip = dinoAnimations[0]; // Fallback to slot 0 if custom naming is missing
-            }
-
-            const action = mixer.clipAction(idleClip);
-            action.setEffectiveWeight(1.0);
-            action.setLoop(THREE.LoopRepeat);
-            action.play();
-            
-            console.log(`[Spawn Process] Active animation clip: ${idleClip.name}`);
+            returnToIdleStance(); // Start in idle stance
         } else {
             console.warn("[Spawn Process] No skeletal animation data detected in asset.");
         }
 
     }, undefined, (error) => {
         console.error("[Spawn Process] Critical asset compilation error:", error);
-        document.getElementById('game-instructions').innerText = "Oh no, the egg failed to open!";
+        document.getElementById('game-instructions').innerText = "Aduh, terjadi kesalahan. Coba lagi ya!";
         gameState = 'SPAWNED_EGG'; // Reset state machine so user can try again
     });
 }
@@ -555,6 +545,49 @@ function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function returnToIdleStance() {
+    if (!mixer || !dinoAnimations || dinoAnimations.length === 0) return;
+    mixer.stopAllAction();
+    let idleClip = dinoAnimations.find(clip => clip.name.toLowerCase().includes('idle')) || dinoAnimations[0];
+    const action = mixer.clipAction(idleClip);
+    action.setEffectiveWeight(1.0);
+    action.setLoop(THREE.LoopRepeat);
+    action.play();
+}
+
+function playOneShotAnimation(clipName, callback) {
+    if (!mixer || !dinoAnimations || dinoAnimations.length === 0) return;
+    mixer.stopAllAction();
+    let clipNameLower;
+
+    if(clipName instanceof Array) {
+        for(let nameOption of clipName) {
+            const foundClip = dinoAnimations.find(clip => clip.name.toLowerCase().includes(nameOption.toLowerCase()));
+            if(foundClip) {
+                clipNameLower = nameOption.toLowerCase();
+                break;
+            }
+        }
+    }else if(typeof clipName === 'string') {
+        clipNameLower = clipName.toLowerCase();
+    }
+
+    if(clipNameLower){
+        let tgtClip = dinoAnimations.find(clip => clip.name.toLowerCase().includes(clipNameLower)) || dinoAnimations[0];
+        const action = mixer.clipAction(tgtClip);
+        mixer.addEventListener('finished', () => {
+            returnToIdleStance();
+            if (callback) callback();
+            mixer.removeEventListener('finished'); // Clean up listener after one use
+        });
+        action.setEffectiveWeight(1.0);
+        action.setLoop(THREE.LoopOnce);
+        action.play();
+    }else{
+        if (callback) callback(); // If no clip found, still call the callback to prevent blocking progression
+    }
 }
 
 function setupEnvironmentLighting() {
