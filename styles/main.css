@@ -97,6 +97,113 @@ canvas {
     animation: deviceSway 3s ease-in-out infinite;
 }
 
+.level-hud-container {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(15, 23, 42, 0.75);
+    padding: 6px 14px 6px 6px;
+    border-radius: 30px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(8px);
+    pointer-events: auto; /* Allow interactions */
+    z-index: 100;
+}
+
+.level-badge {
+    background: linear-gradient(135deg, #e11d48, #9f1239);
+    color: #ffffff;
+    font-weight: 800;
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 20px;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 8px rgba(225, 29, 72, 0.4);
+}
+
+.xp-track-background {
+    width: 100px;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid rgba(0, 0, 0, 0.3);
+}
+
+.xp-track-filler {
+    height: 100%;
+    background: linear-gradient(90deg, #38bdf8, #0369a1);
+    border-radius: 4px;
+    box-shadow: 0 0 6px rgba(56, 189, 248, 0.6);
+}
+
+/* Floating Credits Button Control */
+.ui-circular-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: rgba(15, 23, 42, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 100;
+    pointer-events: auto;
+}
+
+/* Modal Popup Engine */
+.modal-blur-screen {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    pointer-events: auto;
+}
+
+.modal-card {
+    background: #0f172a;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 24px;
+    width: 280px;
+    text-align: center;
+    color: #f8fafc;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+}
+
+.modal-card h3 { margin: 0 0 4px 0; font-size: 18px; color: #38bdf8; }
+.modal-sub { margin: 0 0 16px 0; font-size: 11px; color: #64748b; }
+.modal-divider { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 12px 0; }
+.modal-card p { margin: 6px 0; font-size: 13px; color: #cbd5e1; }
+
+.modal-action-btn {
+    margin-top: 18px;
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    background: #38bdf8;
+    color: #0f172a;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(56, 189, 248, 0.3);
+}
+
 /* Keyframe Animations */
 @keyframes spin {
     to { transform: rotate(360deg); }

@@ -160,6 +160,18 @@ function init() {
 
     });
 
+    const creditsModal = document.getElementById('credits-modal-popup');
+
+    document.getElementById('credits-trigger-btn').addEventListener('click', () => {
+        creditsModal.classList.remove('hidden');
+    });
+
+    document.getElementById('credits-close-btn').addEventListener('click', () => {
+        creditsModal.classList.add('hidden');
+    });
+
+    document.getElementById('system-overlay-container').classList.remove('hidden');
+
     window.addEventListener('touchstart', onTouchStart, { passive: false });
     window.addEventListener('touchmove', onTouchMove, { passive: false });
     window.addEventListener('touchend', onTouchEnd, { passive: false });
@@ -273,16 +285,37 @@ function renderFrame(timestamp, frame) {
                     isWalking = false;
                     if (reticleGroup) reticleGroup.visible = false;
 
-                    // Return cleanly back to the looping Idle animation stance
-                    if (mixer && dinoAnimations && dinoAnimations.length > 0) {
-                        mixer.stopAllAction();
-                        // Access your cached array references to swap clips back smoothly
-                        let idleClip = dinoAnimations.find(clip => clip.name.toLowerCase().includes('idle'));
-                        if (!idleClip) idleClip = dinoAnimations[0];
+                    if (foodScavengeActive && spawnedFoodMesh) {
+                        foodScavengeActive = false;
                         
-                        mixer.clipAction(idleClip).play();
+                        // Find the matching tracking record from our active list
+                        const consumedRecord = activePickables.find(item => item.mesh === spawnedFoodMesh);
+                        
+                        // Execute your unified mixer/mesh cleanup function
+                        if (consumedRecord) {
+                            despawnPickableRecord(consumedRecord);
+                        } else {
+                            // Fallback if record was missing but mesh still exists
+                            scene.remove(spawnedFoodMesh);
+                            spawnedFoodMesh = null;
+                        }
+
+                        // Play eating or combat biting animations sequences
+                        playOneShotAnimation(['eat', 'attack'], null);
+                        console.log("[Gameplay] Target food item successfully consumed at grid coordinates.");
+
+                    }else {
+                        // Return cleanly back to the looping Idle animation stance
+                        if (mixer && dinoAnimations && dinoAnimations.length > 0) {
+                            mixer.stopAllAction();
+                            // Access your cached array references to swap clips back smoothly
+                            let idleClip = dinoAnimations.find(clip => clip.name.toLowerCase().includes('idle'));
+                            if (!idleClip) idleClip = dinoAnimations[0];
+                            
+                            mixer.clipAction(idleClip).play();
+                        }
+                        console.log("[Navigation] Destination reached successfully.");
                     }
-                    console.log("[Navigation] Destination reached successfully.");
                 }
             }
 
@@ -449,14 +482,44 @@ function hatchEgg() {
 function handleScreenTap(frame) {
     if (!spawnedDino) return;
 
-    const gameplayContainer = document.getElementById('gameplay-container');
+    const gameInstructionBox = document.getElementById('game-instruction-box');
     const overlayText = document.getElementById('game-instructions');
 
     if(gameState === 'PLAYING') {
         raycaster.setFromCamera(touchPosition, camera);
 
+        let clickedItemRecord = null;
+    
+        for (let item of activePickables) {
+            const intersects = raycaster.intersectObject(item.mesh, true);
+            if (intersects.length > 0) {
+                clickedItemRecord = item;
+                break; // Target successfully captured! End loop iterations early.
+            }
+        }
+
+        if (clickedItemRecord) {
+            // Evaluate behaviors based on item category parameters
+            if (clickedItemRecord.type === 'food') {
+                // Map parameters back into your existing evaluation process pipelines cleanly
+                spawnedFoodMesh = clickedItemRecord.mesh;
+                currentFoodType = clickedItemRecord.category;
+                
+                processDietEvaluation();
+            } 
+            else if (clickedItemRecord.type === 'item') {
+                console.log(`[Interaction] Item picked up: ${clickedItemRecord.category}! Running coin logic...`);
+                
+                // Coin collection placeholder sequence: instantly clear it
+                scene.remove(clickedItemRecord.mesh);
+                activePickables = activePickables.filter(i => i !== clickedItemRecord);
+                
+                // Play a custom roar or spin animation here if desired!
+            }
+            return; // Terminate execution blocks cleanly so empty floor clicks aren't generated
+        }
+
         const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -spawnedDino.position.y);
-        
         const intersectionPoint = new THREE.Vector3();
         
         // 3. Find exactly where the screen ray intercepts our floor plane equations
@@ -501,8 +564,16 @@ function handleScreenTap(frame) {
         gameState = 'ROARING';
         playOneShotAnimation(['roar','attack2'], () => {
             gameState = 'PLAYING';
-            gameplayContainer.classList.add('hidden');
+            gameInstructionBox.classList.add('hidden');
             startFoodSpawningLoop();
+
+            document.getElementById('gameplay-hud-container').classList.remove('hidden');
+
+            // --- DYNAMIC GIMMICKS: PASS USERDATA STATS INTO HUD ELEMENTS ---
+            if (spawnedDino && spawnedDino.userData) {
+                document.getElementById('hud-level-text').innerText = spawnedDino.userData.level || 1;
+                document.getElementById('hud-xp-filler').style.width = "45%";
+            }
         });
     }
 }
@@ -713,6 +784,33 @@ function proceduralGridSpawn() {
         activePickables.push(itemRecord);
         console.log(`[Grid Spawner] Created ${itemRecord.category} at cell (${chosenCell.x}, ${chosenCell.z})`);
     });
+}
+
+function despawnPickableRecord(itemRecord) {
+    if (!itemRecord) return;
+
+    // 1. Erase the mesh from the 3D scene viewport graph
+    scene.remove(itemRecord.mesh);
+
+    // 2. Unlink and unmount its unique looping animation mixer
+    if (itemRecord.mixer) {
+        itemRecord.mixer.stopAllAction();
+        // Remove it from the global array loop so renderFrame stops updating it
+        pickableMixers = pickableMixers.filter(m => m !== itemRecord.mixer);
+    }
+
+    // 3. Clear global tracking targets if this was the item the dino was actively chasing
+    if (spawnedFoodMesh === itemRecord.mesh) {
+        spawnedFoodMesh = null;
+        isWalking = false;
+        foodScavengeActive = false;
+        returnToIdleStance();
+    }
+
+    // 4. Filter it completely out of your main stage tracking array
+    activePickables = activePickables.filter(i => i !== itemRecord);
+    
+    console.log(`[Lifecycle] System memory cleared for consumed/expired item.`);
 }
 
 function onWindowResize() {

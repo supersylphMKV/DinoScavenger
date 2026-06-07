@@ -32,8 +32,29 @@
         </div>
 
         <div id="gameplay-container" class="ui-screen hidden">
-            <div class="instruction-box">
+            <div id="gameplay-hud-container" class="level-hud-container hidden">
+                <div class="level-badge">LV <span id="hud-level-text">1</span></div>
+                <div class="xp-track-background">
+                    <div id="hud-xp-filler" class="xp-track-filler" style="width: 35%;"></div>
+                </div>
+            </div>
+            <div id="game-instruction-box" class="instruction-box">
                 <span id="game-instructions">Drag egg to move. Double-tap to hatch!</span>
+            </div>
+        </div>
+
+        <div id="system-overlay-container" class="hidden">
+            <button id="credits-trigger-btn" class="ui-circular-btn">ℹ️</button>
+        </div>
+
+        <div id="credits-modal-popup" class="modal-blur-screen hidden">
+            <div class="modal-card">
+                <h3>Dino Park AR</h3>
+                <p class="modal-sub">v0.2.0 Development Build</p>
+                <hr class="modal-divider"/>
+                <p><strong>Lead Architect:</strong> Henri Wijaya</p>
+                <p><strong>Engine Framework:</strong> WebXR & Three.js</p>
+                <button id="credits-close-btn" class="modal-action-btn">Close Matrix</button>
             </div>
         </div>
     </div>
