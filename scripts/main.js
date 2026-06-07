@@ -25,7 +25,6 @@ const ASSETS = {
     reticle: 'assets/ar-target.glb',
     egg: 'assets/creature_egg.glb',
     dinos: [
-        //'assets/op_t-rex.glb', 
         'assets/raptor.glb',
         'assets/stego.glb',
         'assets/tricera.glb',
@@ -33,18 +32,36 @@ const ASSETS = {
         'assets/velociraptor.glb'
     ],
     pickables: [
-
+        { path: 'assets/meat.glb', type: 'food', itemCategory: 'meat' },
+        { path: 'assets/fish.glb', type: 'food', itemCategory: 'meat' },
+        { path: 'assets/pumpkin.glb', type: 'food', itemCategory: 'plant' },
+        { path: 'assets/strawberry.glb', type: 'food', itemCategory: 'plant' },
+        { path: 'assets/watermelon.glb', type: 'food', itemCategory: 'plant' },
+        { path: 'assets/video_game_coin.glb', type: 'item', itemCategory: 'coin' }
     ]
 };
 
 const DINO_REGISTRY = {
-    'op_t-rex':       { speed: 0.18, scale: .50, power: 85, level: 1, health: 150, diet: 'carnivore', breedName: 'T-Rex' },
     'raptor':         { speed: 0.50, scale: .40, power: 45, level: 1, health: 80 , diet: 'carnivore', breedName: 'Raptor' },
     'stego':          { speed: 0.07, scale: .40, power: 60, level: 1, health: 200, diet: 'herbivore', breedName: 'Stegosaurus' },
     'tricera':        { speed: 0.08, scale: .40, power: 70, level: 1, health: 180, diet: 'herbivore', breedName: 'Triceratops' },
     'tyranno':        { speed: 0.15, scale: .40, power: 90, level: 1, health: 160, diet: 'carnivore', breedName: 'Tyrannosaurus' },
     'velociraptor':   { speed: 0.18, scale: .25, power: 40, level: 1, health: 75 , diet: 'carnivore', breedName: 'Velociraptor' }
 };
+
+// --- SPATIAL GRID CONFIGURATION ---
+const CELL_SIZE = .25;            // Each grid cell represents 1x1 meter
+const GRID_EXTENT = 5;            // Radius of grid cells to look around (-5 to +5)
+const MAX_STAGE_ITEMS = 6;        // Absolute limit of pickables allowed on stage at once
+const PICKABLE_LIFETIME = 30;     // Time in seconds before an item despawns
+
+// Tracking storage arrays
+let activePickables = [];         // Array to hold metadata objects for all live items on stage
+let foodSpawnTimeoutID = null;     // Reusing your timing handle loop
+let spawnedFoodMesh = null;        // To track if the dinosaur is currently targeting a food item for scavenging
+let foodScavengeActive = false;  
+
+let pickableMixers = [];// Flag to prevent multiple simultaneous scavenging processes
 
 let mixer = null; // For handling animations if using GLTF models with animations
 const clock = new THREE.Clock();
@@ -158,7 +175,12 @@ function init() {
 // --- Core WebXR Logic ---
 function renderFrame(timestamp, frame) {
     const delta = clock.getDelta();
+
     if (mixer) mixer.update(delta);
+
+    for (let itemMixer of pickableMixers) {
+        itemMixer.update(delta);
+    }
 
     if (frame) {
         const session = renderer.xr.getSession();
@@ -213,53 +235,82 @@ function renderFrame(timestamp, frame) {
             }
         }
 
-        if (gameState === 'PLAYING' && isWalking && spawnedDino) {
-        
-            // 1. Calculate horizontal vector gap between Dino and Target
-            const currentPos = spawnedDino.position;
-            const distanceToTarget = currentPos.distanceTo(targetDestination);
+        if (gameState === 'PLAYING') {
+    
+            if(isWalking && spawnedDino) {
+                // 1. Calculate horizontal vector gap between Dino and Target
+                const currentPos = spawnedDino.position;
+                const distanceToTarget = currentPos.distanceTo(targetDestination);
 
-            // Arrive Safety Threshold: Stop moving if within 3 centimeters
-            if (distanceToTarget > 0.03) {
-                
-                // Vector calculation pointing from Dino out to target location
-                const direction = new THREE.Vector3().subVectors(targetDestination, currentPos);
-                direction.y = 0; // Lock plane vectors so dino doesn't fly upwards
-                direction.normalize();
-
-                // Translate dino position forward frame-by-frame
-                const currentDinoSpeed = spawnedDino.userData.speed;
-                currentPos.addScaledVector(direction, currentDinoSpeed * delta);
-
-                // 2. HANDLE ROTATION WITH YOUR MODEL'S FORWARD VECTOR OFFSET
-                // Calculate standard geometric target rotation angle
-                const targetAngle = Math.atan2(direction.x, direction.z);
-                const correctedAngle = targetAngle - (Math.PI / 2);
-
-                // Construct target Quaternion 
-                const targetRotation = new THREE.Quaternion().setFromAxisAngle(
-                    new THREE.Vector3(0, 1, 0), 
-                    correctedAngle
-                );
-
-                // Smoothly interpolate current rotation towards target path
-                spawnedDino.quaternion.slerp(targetRotation, rotationSpeed * delta);
-
-            } else {
-                // --- TARGET ARRIVED LIFESTAGE RECOVERY ---
-                isWalking = false;
-                if (reticleGroup) reticleGroup.visible = false;
-
-                // Return cleanly back to the looping Idle animation stance
-                if (mixer && dinoAnimations && dinoAnimations.length > 0) {
-                    mixer.stopAllAction();
-                    // Access your cached array references to swap clips back smoothly
-                    let idleClip = dinoAnimations.find(clip => clip.name.toLowerCase().includes('idle'));
-                    if (!idleClip) idleClip = dinoAnimations[0];
+                // Arrive Safety Threshold: Stop moving if within 3 centimeters
+                if (distanceToTarget > 0.03) {
                     
-                    mixer.clipAction(idleClip).play();
+                    // Vector calculation pointing from Dino out to target location
+                    const direction = new THREE.Vector3().subVectors(targetDestination, currentPos);
+                    direction.y = 0; // Lock plane vectors so dino doesn't fly upwards
+                    direction.normalize();
+
+                    // Translate dino position forward frame-by-frame
+                    const currentDinoSpeed = spawnedDino.userData.speed;
+                    currentPos.addScaledVector(direction, currentDinoSpeed * delta);
+
+                    // 2. HANDLE ROTATION WITH YOUR MODEL'S FORWARD VECTOR OFFSET
+                    // Calculate standard geometric target rotation angle
+                    const targetAngle = Math.atan2(direction.x, direction.z);
+                    const correctedAngle = targetAngle - (Math.PI / 2);
+
+                    // Construct target Quaternion 
+                    const targetRotation = new THREE.Quaternion().setFromAxisAngle(
+                        new THREE.Vector3(0, 1, 0), 
+                        correctedAngle
+                    );
+
+                    // Smoothly interpolate current rotation towards target path
+                    spawnedDino.quaternion.slerp(targetRotation, rotationSpeed * delta);
+
+                } else {
+                    // --- TARGET ARRIVED LIFESTAGE RECOVERY ---
+                    isWalking = false;
+                    if (reticleGroup) reticleGroup.visible = false;
+
+                    // Return cleanly back to the looping Idle animation stance
+                    if (mixer && dinoAnimations && dinoAnimations.length > 0) {
+                        mixer.stopAllAction();
+                        // Access your cached array references to swap clips back smoothly
+                        let idleClip = dinoAnimations.find(clip => clip.name.toLowerCase().includes('idle'));
+                        if (!idleClip) idleClip = dinoAnimations[0];
+                        
+                        mixer.clipAction(idleClip).play();
+                    }
+                    console.log("[Navigation] Destination reached successfully.");
                 }
-                console.log("[Navigation] Destination reached successfully.");
+            }
+
+            if(activePickables.length > 0) {
+                // Process backwards down the stack array list structure to handle deletes safely without index skips
+                for (let i = activePickables.length - 1; i >= 0; i--) {
+                    const item = activePickables[i];
+                    
+                    // Subtract frame delta time calculations
+                    item.timeRemaining -= delta;
+
+                    // Despawn check when time ticks down to zero
+                    if (item.timeRemaining <= 0) {
+                        console.log(`[Lifecycle] ${item.category} has spoiled/expired. Despawning.`);
+                        
+                        scene.remove(item.mesh); // Erase from viewport 3D rendering stack pipeline
+                        
+                        // If the dinosaur was actively walking toward this item, break its tracking flags
+                        if (spawnedFoodMesh === item.mesh) {
+                            spawnedFoodMesh = null;
+                            isWalking = false;
+                            foodScavengeActive = false;
+                            returnToIdleStance();
+                        }
+
+                        activePickables.splice(i, 1); // Unlink object from tracking runtime registry memories
+                    }
+                }
             }
         }
 
@@ -451,6 +502,7 @@ function handleScreenTap(frame) {
         playOneShotAnimation(['roar','attack2'], () => {
             gameState = 'PLAYING';
             gameplayContainer.classList.add('hidden');
+            startFoodSpawningLoop();
         });
     }
 }
@@ -538,6 +590,128 @@ function spawnDinosaurProcess(assetPath, position, quaternion) {
         console.error("[Spawn Process] Critical asset compilation error:", error);
         document.getElementById('game-instructions').innerText = "Aduh, terjadi kesalahan. Coba lagi ya!";
         gameState = 'SPAWNED_EGG'; // Reset state machine so user can try again
+    });
+}
+
+function startFoodSpawningLoop() {
+    if (foodSpawnTimeoutID) clearTimeout(foodSpawnTimeoutID);
+
+    // Dynamic tick: evaluate scene requirements every 3 to 6 seconds
+    const loopInterval = Math.random() * 3000 + 3000;
+
+    foodSpawnTimeoutID = setTimeout(() => {
+        if (gameState === 'PLAYING' && spawnedDino) {
+            // Check if we have room under our stage ceiling thresholds
+            if (activePickables.length < MAX_STAGE_ITEMS) {
+                proceduralGridSpawn();
+            }
+        }
+        startFoodSpawningLoop(); // Keep ticking recursively
+    }, loopInterval);
+}
+
+function proceduralGridSpawn() {
+    if (ASSETS.pickables.length === 0) return;
+
+    // 1. Establish structural tracking baselines based on where the dinosaur stands right now
+    const dinoPos = spawnedDino.position;
+    
+    // Find the absolute root anchor grid index center cell coordinates matching 1-meter locks
+    const centerCellX = Math.round(dinoPos.x / CELL_SIZE);
+    const centerCellZ = Math.round(dinoPos.z / CELL_SIZE);
+
+    // 2. Identify currently blocked cells on stage to prevent intersection overlaps
+    // Create a quick lookup map string key format: "X,Z"
+    const occupiedCells = new Set();
+    
+    // Block the center cell so things don't spawn directly inside or underneath the dinosaur model
+    occupiedCells.add(`${centerCellX},${centerCellZ}`);
+
+    activePickables.forEach(item => {
+        const itemCellX = Math.round(item.mesh.position.x / CELL_SIZE);
+        const itemCellZ = Math.round(item.mesh.position.z / CELL_SIZE);
+        occupiedCells.add(`${itemCellX},${itemCellZ}`);
+    });
+
+    // 3. Build a list of all completely vacant cells within our 11x11 zone limits
+    const vacantCells = [];
+
+    for (let offsetX = -GRID_EXTENT; offsetX <= GRID_EXTENT; offsetX++) {
+        for (let offsetZ = -GRID_EXTENT; offsetZ <= GRID_EXTENT; offsetZ++) {
+            
+            const targetCellX = centerCellX + offsetX;
+            const targetCellZ = centerCellZ + offsetZ;
+            const cellKey = `${targetCellX},${targetCellZ}`;
+
+            if (!occupiedCells.has(cellKey)) {
+                vacantCells.push({ x: targetCellX, z: targetCellZ });
+            }
+        }
+    }
+
+    // Edge case: if the stage is completely locked, skip this loop step cleanly
+    if (vacantCells.length === 0) {
+        console.warn("[Grid Spawner] No open sectors found around dinosaur right now.");
+        return;
+    }
+
+    // 4. Select a random entry out of the list of safe vacant cells
+    const chosenCell = vacantCells[Math.floor(Math.random() * vacantCells.length)];
+
+    // 5. Randomize position coordinates within that chosen 1-meter cell boundaries
+    // (Translates to a minor jitter variation up to +/- 0.4 meters from the absolute node node center points)
+    const jitterX = (Math.random() - 0.5) * (CELL_SIZE * 0.8);
+    const jitterZ = (Math.random() - 0.5) * (CELL_SIZE * 0.8);
+
+    const absoluteSpawnX = (chosenCell.x * CELL_SIZE) + jitterX;
+    const absoluteSpawnZ = (chosenCell.z * CELL_SIZE) + jitterZ;
+    const absoluteSpawnY = dinoPos.y; // Keep matching the established ground plane height
+
+    // 6. Roll random item configuration data from asset database references
+    const randomPickable = ASSETS.pickables[Math.floor(Math.random() * ASSETS.pickables.length)];
+
+    loader.load(randomPickable.path, (gltf) => {
+        // Double check session verification safety constraints
+        if (gameState !== 'PLAYING' || !spawnedDino) return;
+
+        const itemMesh = gltf.scene;
+        itemMesh.position.set(absoluteSpawnX, absoluteSpawnY, absoluteSpawnZ);
+        itemMesh.rotation.y = Math.random() * Math.PI * 2;
+        itemMesh.scale.set(0.3, 0.3, 0.3); // Scale adjustment parameters
+
+        itemMesh.traverse((child) => {
+            if (child.isMesh && child.material) {
+                child.material.roughness = 0.6;
+                child.material.metalness = 0.1;
+                if (child.material.map) child.material.map.colorSpace = THREE.SRGBColorSpace;
+                child.material.needsUpdate = true;
+            }
+        });
+
+        scene.add(itemMesh);
+
+        let itemMixer = null;
+
+        if (gltf.animations && gltf.animations.length > 0) {
+            itemMixer = new THREE.AnimationMixer(itemMesh);
+            const defaultClip = gltf.animations[0]; // Play the first baked track (e.g., 'spin', 'float')
+            const action = itemMixer.clipAction(defaultClip);
+            action.setLoop(THREE.LoopRepeat); // Force it to loop infinitely
+            action.play();
+            
+            pickableMixers.push(itemMixer); // Register it to our global update list
+        }
+
+        // 7. Inject metadata tracking block references into runtime collection array structures
+        const itemRecord = {
+            mesh: itemMesh,
+            type: randomPickable.type,                 // 'food' or 'item'
+            category: randomPickable.itemCategory,     // 'meat', 'plant', 'coin'
+            timeRemaining: PICKABLE_LIFETIME           // Countdown clock tracker
+        };
+
+        activePickables.push(itemRecord);
+        console.log(`[Grid Spawner] Created ${itemRecord.category} at cell (${chosenCell.x}, ${chosenCell.z})`);
     });
 }
 
